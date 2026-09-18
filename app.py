@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 
 st.set_page_config(page_title="삼각함수 학습 웹앱", layout="wide")
@@ -23,33 +24,56 @@ menu = st.sidebar.selectbox(
 # ---------------------------------------------------------
 if menu == "1. 삼각함수 그래프 & 역함수 탐구":
     st.header("1. 삼각함수 그래프 시각적으로 확인하기")
-    st.markdown("상단에서 함수의 종류, 진폭, 주기, 평행이동 등을 조절하고, 하단에서 특정 $y$값에 해당하는 $x$값을 확인해보세요.")
+    st.markdown("상단에서 함수의 종류, 진폭, 주기, 평행이동(위상 및 수직이동)을 조절하여 **그래프의 위치가 변환**되는 것을 확인해보세요.")
     
     st.sidebar.subheader("🎛️ 그래프 설정 요인")
     func_type = st.sidebar.selectbox("함수 선택", ["사인 (Sine)", "코사인 (Cosine)", "탄젠트 (Tangent)"])
     amplitude = st.sidebar.slider("진폭 (최댓값 조절)", 0.5, 5.0, 1.0, 0.5)
     period_mult = st.sidebar.slider("주기 조절 배율", 0.5, 3.0, 1.0, 0.25)
-    phase_shift = st.sidebar.slider("위상(평행이동) [라디안]", -np.pi, np.pi, 0.0, 0.1)
-    vertical_shift = st.sidebar.slider("수직이동", -3.0, 3.0, 0.0, 0.5)
+    phase_shift = st.sidebar.slider("위상(좌우 평행이동) [라디안]", -np.pi, np.pi, 0.0, 0.1)
+    vertical_shift = st.sidebar.slider("수직 위치 변환 (상하 평행이동)", -3.0, 3.0, 0.0, 0.5)
 
-    # x 범위 설정 및 데이터프레임 생성 (Streamlit 내장 차트 활용)
-    x = np.linspace(-2 * np.pi, 2 * np.pi, 500)
+    # x 범위 설정
+    x = np.linspace(-2 * np.pi, 2 * np.pi, 1000)
     
+    # 함수 값 계산 (수직이동은 y값 자체에 더해져 그래프 위치를 위/아래로 통째로 이동시킴)
     if "사인" in func_type:
         y = amplitude * np.sin(period_mult * x - phase_shift) + vertical_shift
-        chart_data = pd.DataFrame({"x": x, "y (Sine)": y})
+        title_str = f"y = {amplitude} \\sin({period_mult}x - {phase_shift:.2f}) + {vertical_shift}"
     elif "코사인" in func_type:
         y = amplitude * np.cos(period_mult * x - phase_shift) + vertical_shift
-        chart_data = pd.DataFrame({"x": x, "y (Cosine)": y})
+        title_str = f"y = {amplitude} \\cos({period_mult}x - {phase_shift:.2f}) + {vertical_shift}"
     else:
         y = amplitude * np.tan(period_mult * x - phase_shift) + vertical_shift
-        y[np.abs(np.gradient(y)) > 30] = np.nan  # 점근선 처리
-        chart_data = pd.DataFrame({"x": x, "y (Tangent)": y})
+        y[np.abs(np.gradient(y)) > 50] = np.nan  # 점근선 끊기 처리
+        title_str = f"y = {amplitude} \\tan({period_mult}x - {phase_shift:.2f}) + {vertical_shift}"
 
-    chart_data.set_index("x", inplace=True)
-    st.line_chart(chart_data)
+    # 선명한 축과 원점 교차 그래프 생성
+    fig, ax = plt.subplots(figsize=(10, 5))
+    
+    # 그래프 플롯
+    ax.plot(x, y, label=title_str, color='#1f77b4', linewidth=2.5)
+    
+    # x축, y축을 원점에 선명하게 표시
+    ax.axhline(0, color='black', linewidth=1.5, linestyle='-')
+    ax.axvline(0, color='black', linewidth=1.5, linestyle='-')
+    
+    # 격자 선명하게 설정
+    ax.grid(True, which='both', linestyle='--', linewidth=0.8, alpha=0.7)
+    
+    # 축 범위 고정 (수직 위치 변환 시 눈금이 움직이지 않고 그래프 위치만 이동하도록 고정된 축 범위 유지)
+    ax.set_xlim(-2 * np.pi, 2 * np.pi)
+    ax.set_ylim(-6.0, 6.0)
+    
+    ax.set_title(f"Graph: {title_str}", fontsize=14, fontweight='bold')
+    ax.set_xlabel("x (radians)", fontsize=12)
+    ax.set_ylabel("y", fontsize=12)
+    ax.legend(loc='upper right', fontsize=11)
+    
+    st.pyplot(fig)
     
     # 역함수 (y값에 따른 x값 찾기) 기능
+    st.markdown("---")
     st.subheader("🔍 특정 y값에 따른 x 찾기 (역함수 탐색)")
     col1, col2 = st.columns(2)
     with col1:
@@ -58,7 +82,7 @@ if menu == "1. 삼각함수 그래프 & 역함수 탐구":
         x_min_range = st.number_input("x 범위 최소값 (라디안)", value=float(-2*np.pi), step=0.5)
         x_max_range = st.number_input("x 범위 최대값 (라디안)", value=float(2*np.pi), step=0.5)
 
-    x_fine = np.linspace(x_min_range, x_max_range, 2000)
+    x_fine = np.linspace(x_min_range, x_max_range, 5000)
     if "사인" in func_type:
         y_fine = amplitude * np.sin(period_mult * x_fine - phase_shift) + vertical_shift
     elif "코사인" in func_type:
@@ -87,40 +111,65 @@ if menu == "1. 삼각함수 그래프 & 역함수 탐구":
 # ---------------------------------------------------------
 elif menu == "2. 단위 원과 삼각함수 연동 시각화":
     st.header("2. 원을 통한 삼각함수 시각적으로 파악하기")
-    st.markdown("슬라이더를 통해 각도(라디안)를 조절하고 삼각함숫값의 변화를 확인해보세요.")
+    st.markdown("왼쪽 단위 원의 각도를 조절하면, 오른쪽 그래프에서 선택한 삼각함수들의 값이 어떻게 매칭되는지 확인할 수 있습니다.")
 
-    theta = st.slider("각도 설정 (라디안)", 0.0, float(2 * np.pi), float(np.pi / 4), 0.05)
-    
-    cos_val = np.cos(theta)
-    sin_val = np.sin(theta)
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("현재 각도", f"{theta:.2f} 라디안", f"{np.degrees(theta):.1f}°")
-    col2.metric("코사인 값 (cos)", f"{cos_val:.4f}")
-    col3.metric("사인 값 (sin)", f"{sin_val:.4f}")
-    if np.cos(theta) != 0:
-        col3.metric("탄젠트 값 (tan)", f"{np.tan(theta):.4f}")
-    else:
-        col3.metric("탄젠트 값 (tan)", "정의되지 않음 (무한대)")
+    col_l, col_r = st.columns([1, 1])
 
-    st.markdown("---")
-    show_sin = st.checkbox("사인함수 (sin x) 값 보기", value=True)
-    show_cos = st.checkbox("코사인함수 (cos x) 값 보기", value=True)
-    show_tan = st.checkbox("탄젠트함수 (tan x) 값 보기", value=False)
+    with col_l:
+        st.subheader("좌측: 단위 원 (Unit Circle)")
+        theta = st.slider("각도 설정 (라디안)", 0.0, float(2 * np.pi), float(np.pi / 4), 0.05)
+        
+        fig_circle, ax_c = plt.subplots(figsize=(5, 5))
+        circle = plt.Circle((0, 0), 1, color='gray', fill=False, linestyle='--')
+        ax_c.add_patch(circle)
+        
+        cos_val = np.cos(theta)
+        sin_val = np.sin(theta)
+        
+        ax_c.plot([0, cos_val], [0, 0], 'r-', linewidth=2, label='cos')
+        ax_c.plot([cos_val, cos_val], [0, sin_val], 'g-', linewidth=2, label='sin')
+        ax_c.plot([0, cos_val], [0, sin_val], 'b-', linewidth=2, label='동경 r=1')
+        ax_c.plot(cos_val, sin_val, 'ko', markersize=6)
+        
+        ax_c.set_xlim(-1.5, 1.5)
+        ax_c.set_ylim(-1.5, 1.5)
+        ax_c.axhline(0, color='black', linewidth=1.2)
+        ax_c.axvline(0, color='black', linewidth=1.2)
+        ax_c.set_aspect('equal')
+        ax_c.grid(True, linestyle=':', alpha=0.6)
+        ax_c.set_title(f"현재 각도: {theta:.2f} rad ({np.degrees(theta):.1f}°)")
+        st.pyplot(fig_circle)
 
-    x_vals = np.linspace(0, 2 * np.pi, 200)
-    plot_dict = {}
-    if show_sin:
-        plot_dict["sin(x)"] = np.sin(x_vals)
-    if show_cos:
-        plot_dict["cos(x)"] = np.cos(x_vals)
-    if show_tan:
-        t_vals = np.tan(x_vals)
-        t_vals[np.abs(np.gradient(t_vals)) > 20] = np.nan
-        plot_dict["tan(x)"] = t_vals
+    with col_r:
+        st.subheader("우측: 삼각함수 그래프 연동")
+        show_sin = st.checkbox("사인함수 (sin x) 보기", value=True)
+        show_cos = st.checkbox("코사인함수 (cos x) 보기", value=True)
+        show_tan = st.checkbox("탄젠트함수 (tan x) 보기", value=False)
 
-    df_plot = pd.DataFrame(plot_dict, index=x_vals)
-    st.line_chart(df_plot)
+        x_vals = np.linspace(0, 2 * np.pi, 500)
+        fig_func, ax_f = plt.subplots(figsize=(6, 5))
+
+        if show_sin:
+            ax_f.plot(x_vals, np.sin(x_vals), 'g-', label='y = sin(x)', alpha=0.7, linewidth=2)
+            ax_f.plot(theta, np.sin(theta), 'go', markersize=8)
+        if show_cos:
+            ax_f.plot(x_vals, np.cos(x_vals), 'r-', label='y = cos(x)', alpha=0.7, linewidth=2)
+            ax_f.plot(theta, np.cos(theta), 'ro', markersize=8)
+        if show_tan:
+            tan_vals = np.tan(x_vals)
+            tan_vals[np.abs(np.gradient(tan_vals)) > 20] = np.nan
+            ax_f.plot(x_vals, tan_vals, 'b-', label='y = tan(x)', alpha=0.7, linewidth=2)
+            if np.cos(theta) != 0:
+                ax_f.plot(theta, np.tan(theta), 'bo', markersize=8)
+
+        ax_f.axvline(theta, color='orange', linestyle='--', linewidth=1.5, label=f'현재 각도 (x = {theta:.2f})')
+        ax_f.axhline(0, color='black', linewidth=1.2)
+        ax_f.set_xlim(0, 2 * np.pi)
+        ax_f.set_ylim(-3, 3)
+        ax_f.grid(True, linestyle=':', alpha=0.6)
+        ax_f.legend(loc='upper right')
+        ax_f.set_title("선택된 삼각함수 상응 값")
+        st.pyplot(fig_func)
 
 
 # ---------------------------------------------------------
